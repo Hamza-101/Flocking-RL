@@ -1,5 +1,5 @@
 SimulationVariables = {
-    "SimAgents" : 40,
+    "SimAgents" : 20,
     "AgentData" : [],
     "SafetyRadius" : 2, 
     "NeighborhoodRadius" : 10,
@@ -9,8 +9,8 @@ SimulationVariables = {
     "AccelerationInit": 0.0,
     "dt" : 0.1,
     "TimeSteps" : 1000,
-    "X" : 20,
-    "Y" : 20,
+    "X" : 10,
+    "Y" : 10,
     "Reward" : "", # Check this
     "TrainFile" : "Simulations\Config_0",
     "TestFile" : "Simulations\Test"
