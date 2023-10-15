@@ -109,12 +109,16 @@ class FlockingEnv(gym.Env):
 
         obs = np.array([[agent.position[0], agent.position[1], agent.velocity[0], agent.velocity[1]] for agent in self.agents])
 
-        for Agent in self.agents:
-            reward += self.calculate_reward(Agent)
+        for agent in self.agents:
+            reward += self.calculate_reward(agent)
 
         done = False  # Implement the termination condition based on your criteria
         info = {} 
-
+        with open('Results.txt', 'a+') as f:
+            # f.write(f"Episode: {reward}\n")
+            f.write("-------------------------\n")
+            f.write(f"reward: {reward}\n")
+            f.write("-------------------------\n")
         return obs, reward, done, info
         
     def reset(self):
