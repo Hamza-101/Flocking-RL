@@ -84,29 +84,16 @@ class FlockingEnv(gym.Env):
 def read_agent_locations():
     with open(rf"{Results['InitPositions']}\config.json", "r") as f:
         data = json.load(f)
-        agents = [Agent(position) for position in data]
+        positions = data  # Assuming the positions are directly loaded from the file
         print("File loaded")
-    return agents
-
-
-# Adjust the total_timesteps according to your needs
-
-    # #Test the model
-    # obs = env.reset()
-    # for i in range(1000):  # Adjust the number of steps for testing
-    #     action, _ = model.predict(obs, deterministic=True)
-    #     obs, reward, done, _ = env.step(action)
-    #     if done:
-    #         obs = env.reset()
-
-
+    return positions
 
 agent_locations = read_agent_locations()
 agents=[Agent(position) for position in agent_locations]
 
 env = DummyVecEnv([lambda: FlockingEnv(agents)])
 
-model = PPO("MlpPolicy", env, verbose = 1, tensorboard_log = "./ppo_Agents_tensorboard/", log_interval=1000)
+model = PPO("MlpPolicy", env, verbose = 1, tensorboard_log = "./ppo_Agents_tensorboard/")
 model.learn(total_timesteps = SimulationVariables["TimeSteps"])
 
 model.save("PPO")
