@@ -1,5 +1,5 @@
 # Flocking-RL
-An implementation of Reynold's model based RL flocking. 
+An implementation of a 2D Flocking model based using RL. 
 
 # Background
 ## Flocking
