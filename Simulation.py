@@ -7,7 +7,6 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.env_checker import check_env
 from Params import *
 
-#####################Reynolds vs RL
 class Agent:
 
     def __init__(self, position):
