@@ -16,14 +16,6 @@ SimulationVariables = {
     "TestFile" : "Simulations\Test"
 }
 
-ReynoldsVariables = {
-    "w_alignment" : 0.5,
-    "w_cohesion" : 1.5,
-    "w_separation" : 3.0
-}
-
-# Make requirements file
-
 Results = {
     "Directory" : "Simulations",
     "Sim" : "Simulation", # Change this
@@ -34,5 +26,3 @@ Results = {
     "TotalReward": [] # Sum Array when needed
 }
 
-Hyperparameters = {   
-}
