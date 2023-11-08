@@ -14,7 +14,6 @@ An implementation of a 2D Flocking model based using RL.
 
 
 ## Result
-https://github.com/Hamza-101/Flocking/assets/45544623/80bcafb9-bbdc-468a-9460-63ad30c0af63
 
 
 ## Prerequisites
