@@ -15,10 +15,7 @@ SimulationVariables = {
 }
 
 Results = {
-    "Directory": "Simulations",
     "Sim": "Simulation",
     "InitPositions": "Simulations\Config_0",
     "Positions": "agent_positions.json",
-    "FinalPositions": "",
-    "SimDetails": SimulationVariables
 }
