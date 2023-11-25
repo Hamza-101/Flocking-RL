@@ -1,14 +1,15 @@
 import json
 import gym
 from gym import spaces
+from Params import *
+import math
 import numpy as np
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
-from Params import *
+from stable_baselines3.common.vec_env import DummyVecEnv
+
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.callbacks import BaseCallback
 from multiprocessing import freeze_support
-import math
 
 ############################################################
 ############################################################
@@ -48,8 +49,8 @@ class FlockingEnv(gym.Env):
         for agent in self.agents:
             agent.velocity = np.round(np.random.uniform(-SimulationVariables["VelocityInit"], SimulationVariables["VelocityInit"], size=2), 2)
 
-        min_action = np.array([[-5, -5]] * len(self.agents), dtype=np.float32)
-        max_action = np.array([[5, 5]] * len(self.agents), dtype=np.float32)
+        min_action = np.array([[-1, -1]] * len(self.agents), dtype=np.float32)
+        max_action = np.array([[1, 1]] * len(self.agents), dtype=np.float32)
         self.action_space = spaces.Box(low=min_action, high=max_action, dtype=np.float32)
         min_obs = np.array([[-np.inf, -np.inf]] * len(self.agents), dtype=np.float32)
         max_obs = np.array([[np.inf, np.inf]] * len(self.agents), dtype=np.float32)
@@ -59,16 +60,16 @@ class FlockingEnv(gym.Env):
         info={}
         reward = 0
         done = False 
-        
+        Collisions = {}
+
         observations=self.simulate_agents(actions)
 
-        cohesion_reward, separation_reward, alignment_reward, velocity_matching_reward, flocking_reward, collision_penalty, collision = self.calculate_reward()
+        cohesion_reward, alignment_reward, collision_penalty, Collisions = self.calculate_reward()
 
         info["CohesionReward"]=cohesion_reward
-        info["SeparationReward"]=separation_reward
+        # info["SeparationReward"]=separation_reward
         info["AlignmentReward"]=alignment_reward
-        info["FlockReward"]=flocking_reward
-        info["VelocityMatchingReward"]=velocity_matching_reward
+        # info["VelocityMatchingReward"]=velocity_matching_reward
         info["CollisionPenalty"]=collision_penalty
         info["Reward"]=sum(info.values())
         reward=info["Reward"]
@@ -135,63 +136,37 @@ class FlockingEnv(gym.Env):
             return observation.reshape((len(self.agents), 2))
 
     def calculate_reward(self):
-        cohesion_reward = 0
-        separation_reward = 0
-        velocity_matching_reward = 0        #Remove velocity matching
-        flocking_reward = 0
-        alignment_reward = 0
-        collision_penalty = 0
+        CohesionReward = 0
+        SeparationReward = 0
+        AlignmentReward = 0
+
+        # VelocityReward = 0        #Remove velocity matching
+        CollisionPenalty = 0
         neighbor_indices = [[] for _ in range(len(self.agents))]  # Initialize empty lists for neighbor indices
         neighbor_velocities = [[] for _ in range(len(self.agents))]
-        collision=False         #See if this is correct place
+        Collisions = {}        #See if this is correct place
 
         # Finding neighbors information
         for agent in self.agents:
             neighbor_indices, neighbor_velocities = self.get_closest_neighbors(agent, SimulationVariables["NeighborhoodRadius"])
 
-            for OtherAgent in neighbor_indices:
-                other = self.agents[OtherAgent]
+            CollisionPenalty, collisions_agent = self.CollisionPenalty(agent, neighbor_indices)
 
-                distance = np.linalg.norm(agent.position - other.position)
+            CohesionReward = self.calculate_CohesionReward(agent, neighbor_indices)
+            AlignmentReward = self.calculate_AlignmentReward(agent, neighbor_velocities)
 
-                # Increase the weight of the cohesion reward
-                if distance <= SimulationVariables["NeighborhoodRadius"]:
-                    cohesion_reward += 100 
-
-                if distance > SimulationVariables["NeighborhoodRadius"]:
-                    cohesion_reward -= 100 
-
-                    # cohesion_reward += 100 * distance
-
-                if distance < SimulationVariables["SafetyRadius"]:
-                    separation_reward -= 100
-                
-                if distance > SimulationVariables["SafetyRadius"]:
-                    separation_reward += 100
-
-                velocity_matching_reward += np.linalg.norm(np.mean(neighbor_velocities, axis=0) - agent.velocity)
-
-                # Add a reward for moving in the same direction
-                average_velocity = np.mean([velocity for velocity in neighbor_velocities], axis=0)
-                velocity_direction_reward = np.dot(agent.velocity, average_velocity) / (np.linalg.norm(agent.velocity) * np.linalg.norm(average_velocity))
-                velocity_matching_reward += velocity_direction_reward
-
-                # Calculate and add alignment reward
-                desired_velocity = self.alignment_calculation(agent, neighbor_velocities)
-                orientation_diff = np.arctan2(desired_velocity[1], desired_velocity[0]) - np.arctan2(agent.velocity[1], agent.velocity[0])
-                if orientation_diff > np.pi:
-                    orientation_diff -= 2 * np.pi
-                elif orientation_diff < -np.pi:
-                    orientation_diff += 2 * np.pi
-
-                alignment_reward += 1 - np.abs(orientation_diff)
+            Collisions[agent] = collisions_agent
+                # CohesionReward += 100 * distance
+                # VelocityReward += np.linalg.norm(np.mean(neighbor_velocities, axis=0) - agent.velocity)
+                # # Add a reward for moving in the same direction
+                # average_velocity = np.mean([velocity for velocity in neighbor_velocities], axis=0)
+                # velocity_direction_reward = np.dot(agent.velocity, average_velocity) / (np.linalg.norm(agent.velocity) * np.linalg.norm(average_velocity))
+                # VelocityReward += velocity_direction_reward
 
                 # Apply collision penalty
                 # Add check collision
-                if distance < SimulationVariables["SafetyRadius"]:
-                    collision_penalty -= 1000
-        
-        return cohesion_reward, separation_reward, alignment_reward, velocity_matching_reward, flocking_reward, collision_penalty, collision
+                
+        return CohesionReward, AlignmentReward, CollisionPenalty, Collisions
     
     def alignment_calculation(self, agent, neighbor_velocities):
         if len(neighbor_velocities) > 0:
@@ -216,6 +191,61 @@ class FlockingEnv(gym.Env):
     # Better reward function
     # def calculate_reward(self):
     #     return cohesion_reward, separation_reward, velocity_matching_reward, flock_reward, collision_penalty
+
+
+    def CollisionPenalty(self, agent, neighbor_indices):
+        #Every agents' total collision penalty every timestep
+        Collision = False
+        CollisionPenalty = 0
+        distances=[]
+
+        neighbor_agents = [self.agents[idx] for idx in neighbor_indices]
+
+        for n_agent in neighbor_agents:             #Use neighborhood or all
+            distances.append(np.linalg.norm(agent.position - n_agent.position))
+
+        for distance in distances:
+            if distance < SimulationVariables["SafetyRadius"]:            
+                CollisionPenalty -= 1000
+                Collision = True
+
+        return CollisionPenalty, Collision
+    
+    def calculate_CohesionReward(self, agent, neighbor_indices):
+        #Every agents' total cohesion penalty every timestep
+        CohesionReward = 0
+        distances=[]
+
+        neighbor_agents = [self.agents[idx] for idx in neighbor_indices]
+
+        for n_agent in neighbor_agents:
+            print(n_agent)
+            distances.append(np.linalg.norm(agent.position - n_agent.position))
+
+        for distance in distances:                
+            if distance <= SimulationVariables["NeighborhoodRadius"]:
+                CohesionReward += 100 
+
+            else:
+                CohesionReward -= 100 
+            
+        return CohesionReward
+    
+    def calculate_AlignmentReward(self, agent, neighbor_velocities):
+        #Every agents' total alignment penalty every timestep
+        AlignmentReward = 0
+
+        desired_velocity = self.alignment_calculation(agent, neighbor_velocities)
+        orientation_diff = np.arctan2(desired_velocity[1], desired_velocity[0]) - np.arctan2(agent.velocity[1], agent.velocity[0])
+
+        if orientation_diff > np.pi:
+            orientation_diff -= 2 * np.pi
+        elif orientation_diff < -np.pi:
+            orientation_diff += 2 * np.pi
+
+        AlignmentReward = 1 - np.abs(orientation_diff)
+
+        return AlignmentReward 
 
 class HalveLearningRateCallback(BaseCallback):
     def __init__(self, verbose=0):
@@ -242,21 +272,16 @@ def make_env():
 ####################Call Back Learning rate#####################
 
 
-    # freeze_support()
-
-    # Subprocenvs = [make_env for _ in range(SimulationVariables["NumEnvs"])]
-    # Envs = SubprocVecEnv(Subprocenvs)
-
 Name = rf'Agents_{SimulationVariables["SimAgents"]}_PPO_{SimulationVariables["TrainTimeSteps"]}'
 
-# env = DummyVecEnv([lambda: FlockingEnv()])
-# model = PPO("MlpPolicy", env,  tensorboard_log="./ppo_Agents_tensorboard/", learning_rate=0.0005, verbose=1)
+env = DummyVecEnv([lambda: FlockingEnv()])
+model = PPO("MlpPolicy", env,  tensorboard_log="./ppo_Agents_tensorboard/")
 # callback = HalveLearningRateCallback()
-# model.learn(total_timesteps=SimulationVariables["TrainTimeSteps"])  # Adjust the multiplier
+model.learn(total_timesteps=SimulationVariables["TrainTimeSteps"])  # Adjust the multiplier
 
-# # Save the model
-# model.save(Name)
-# env.close()
+# Save the model
+model.save(Name)
+env.close()
 
 # Load the model
 env = FlockingEnv()
@@ -265,7 +290,7 @@ model = PPO.load(Name)
 
 
 # Run for 10 episodes
-for episode in range(1, SimulationVariables["Episodes"]):
+for episode in range(1, RLVariables['Episodes']):
 
     obs = env.reset()
     done = False
@@ -277,9 +302,9 @@ for episode in range(1, SimulationVariables["Episodes"]):
     episode_rewards=[]
     print("Episode", episode)
     # Completion condition
-    while ((timestep<=3000) or not done):
+    while ((timestep<=1000) or not done):
         
-        action, _ = model.predict(obs)
+        action, state = model.predict(obs)
 
         obs, reward, done, info = env.step(action) ######### env.step() #Add condition to exit on collision
         total_reward += reward
@@ -294,8 +319,8 @@ for episode in range(1, SimulationVariables["Episodes"]):
     print("Total Accumulated Reward:", total_reward)
     
 
-with open('agent_positionsTest.json', 'w') as f:
-    json.dump(positions_dict, f, indent=4)
+    with open(rf'agent_positionsTest_{episode}.json', 'w') as f:        #Add to params file
+        json.dump(positions_dict, f, indent=4)
 
 
 env.close()
