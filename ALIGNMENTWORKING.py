@@ -180,16 +180,7 @@ class FlockingEnv(gym.Env):
             AlignmentReward = (100*self.calculate_AlignmentReward(agent, neighbor_velocities))
 
             Collisions[idx].append(collisions_agent)
-                # CohesionReward += 100 * distance
-                # VelocityReward += np.linalg.norm(np.mean(neighbor_velocities, axis=0) - agent.velocity)
-                # # Add a reward for moving in the same direction
-                # average_velocity = np.mean([velocity for velocity in neighbor_velocities], axis=0)
-                # velocity_direction_reward = np.dot(agent.velocity, average_velocity) / (np.linalg.norm(agent.velocity) * np.linalg.norm(average_velocity))
-                # VelocityReward += velocity_direction_reward
-
-                # Apply collision penalty
-                # Add check collision
-                # CohesionReward, AlignmentReward, CollisionPenalty,
+               
 
         return AlignmentReward, Collisions
     
