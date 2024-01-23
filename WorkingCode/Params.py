@@ -11,7 +11,7 @@ SimulationVariables = {
     "Y": 10,
     "dt": 0.1,
     "EvalTimeSteps": 3000,
-    "LearningTimeSteps":200000,
+    "LearningTimeSteps":1000000,
     "TotalEps" : 10,
     "NumEnvs": 6,
     "MAX_COUNTER_VALUE": 2048
@@ -34,7 +34,7 @@ RLVariables = {
 Results = {
     "Sim": "Simulation",
     "InitPositions": "CorrectConfigs\Config_",
-    "Positions": "agent_positionsTestAllignment_3.json", 
+    "Positions": "FlockingCustom1.json", 
     "Rewards": "RewardTesting_Episode",
     "EpRewards": "EpisodeTraining",
     "Directory": "CorrectConfigs"       #Config Generator

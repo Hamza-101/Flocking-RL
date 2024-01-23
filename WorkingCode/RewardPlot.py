@@ -6,7 +6,7 @@ all_rewards = []
 
 # Load rewards from the JSON files for each episode
 for episode in range(1, RLVariables['Episodes']):
-    with open(f'{Results["EpRewards"]}_Allignment_{episode}.json', 'r') as f:
+    with open(f'{Results["Rewards"]}{episode}.json', 'r') as f:
         rewards = json.load(f)
         all_rewards.append(rewards)
 
