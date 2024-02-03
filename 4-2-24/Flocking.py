@@ -76,11 +76,25 @@ class FlockingEnv(gym.Env):
         # print(actions)
         # print(actions)
         
+
+
+
+
+
+        #CHECK THIS
         continuous_action_x = actions[::2] * 10 - 50  # x acceleration
         continuous_action_y = actions[1::2] * 10 - 50  # y acceleration
 
         # Combine x and y accelerations into a single array
         continuous_action = np.column_stack((continuous_action_x, continuous_action_y))
+        
+
+
+
+
+
+
+
         
         self.current_timestep+=1
         reward=0
@@ -364,17 +378,6 @@ def delete_files():
                 os.remove(file_path)
                 print(f"File {file_path} has been deleted.")           
 
-
-def create_folders():
-    positions_directory = rf"{Files['Flocking']}/Testing/Positions/"
-    velocities_directory = rf"{Files['Flocking']}/Testing/Dynamics/Velocities/"
-    accelerations_directory = rf"{Files['Flocking']}/Testing/Dynamics/Accelerations/"
-
-    os.makedirs(positions_directory, exist_ok=True)
-    os.makedirs(velocities_directory, exist_ok=True)
-    os.makedirs(accelerations_directory, exist_ok=True)
-
-
 # Check if valid
 if os.path.exists(Results["Rewards"]):
     os.remove(Results["Rewards"])
@@ -406,8 +409,15 @@ model = PPO.load(rf"{Files['Flocking']}\\Models\\Flocking")
 
 
 delete_files()
-create_folders()
 
+
+positions_directory = rf"{Files['Flocking']}/Testing/Positions/"
+velocities_directory = rf"{Files['Flocking']}/Testing/Dynamics/Velocities/"
+accelerations_directory = rf"{Files['Flocking']}/Testing/Dynamics/Accelerations/"
+
+os.makedirs(positions_directory, exist_ok=True)
+os.makedirs(velocities_directory, exist_ok=True)
+os.makedirs(accelerations_directory, exist_ok=True)
 
 
 
