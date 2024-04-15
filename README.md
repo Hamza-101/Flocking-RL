@@ -27,12 +27,13 @@ https://github.com/Hamza-101/Flocking-RL/assets/45544623/40f74f02-5a82-4719-a49b
 ### Install Dependencies
 ```pip install -r requirements.txt```
 
-## Usage
+## Working
 ### Program Structure
 <ol>
-<li> Params</li>
+<li> Settings </li>
 <li> ConfigGenerator</li>
 <li> Simulation</li>
+<li> Analysis</li>
 <li> PlotAnimation</li>
 </ol>
 
@@ -40,7 +41,10 @@ https://github.com/Hamza-101/Flocking-RL/assets/45544623/40f74f02-5a82-4719-a49b
 ## Supported Algorithms 
 <ol>
   <li>PPO (Proximal Policy Optimization) ✅ </li>
-  <li>TRPO ✅ </li>
+  <li>TRPO </li>
+  <li>DQN </li>
+  <li>MADDPG </li>
+
 </ol>
 
 ## Links
@@ -53,4 +57,6 @@ https://github.com/Hamza-101/Flocking-RL/assets/45544623/40f74f02-5a82-4719-a49b
 #### Algorithms
 [PPO](https://openai.com/research/openai-baselines-ppo) ,
 [TRPO](https://spinningup.openai.com/en/latest/algorithms/trpo.html#trust-region-policy-optimization)
+[DQN](https://courses.engr.illinois.edu/cs546/sp2018/Slides/Apr05_Minh.pdf)
+[MADDPG](https://arxiv.org/pdf/1706.02275.pdf)
 
