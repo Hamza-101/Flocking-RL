@@ -11,7 +11,7 @@ import json
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 from stable_baselines3.common.noise import NormalActionNoise
-
+from tqdm import tqdm
 # Why reward less
 # Continuous reward
 # Exit on collision
@@ -383,35 +383,58 @@ def generateResults2():
     plt.savefig("Combined.png", dpi=3000)
 
 def generateDynamics():
-    for episode in range(0, SimulationVariables['Episodes']):
-        with open(rf"{Files['Flocking']}/Testing/Positions/Episode_{episode}_velocities.json", 'r') as f:
+    for episode in range(SimulationVariables["Episodes"]):
+
+        with open(os.path.join(rf"{Files['Flocking']}/Testing/Positions/Episode_{episode}_velocities.json"), 'r') as f:
             velocities_dict = json.load(f)
-        with open(rf"{Files['Flocking']}/Testing/Positions/Episode_{episode}_accelerations.json", 'r') as f:
+        with open(os.path.join(rf"{Files['Flocking']}/Testing/Positions/Episode_{episode}_accelerations.json"), 'r') as f:
             accelerations_dict = json.load(f)
 
-        # Extract velocities and accelerations for the current agent
-        velocities = velocities_dict[str(i)]
-        accelerations = accelerations_dict[str(i)]
+        num_agents = len(velocities_dict)  # Assuming all agents have the same number of velocities
 
-        # Plot velocities
+        # Initialize lists to store all agents' velocities and accelerations
+        all_velocity_magnitudes = []
+        all_acceleration_magnitudes = []
+
+        for i in range(num_agents):
+            velocities = np.array(velocities_dict[str(i)])
+            accelerations = np.array(accelerations_dict[str(i)])
+
+            # Calculate magnitudes
+            velocity_magnitudes = np.linalg.norm(velocities, axis=1)
+            acceleration_magnitudes = np.linalg.norm(accelerations, axis=1)
+
+            # Append to the list of all agents' velocities and accelerations
+            all_velocity_magnitudes.append(velocity_magnitudes)
+            all_acceleration_magnitudes.append(acceleration_magnitudes)
+
+        # Plot velocities for all agents in one file per episode
         plt.figure(figsize=(10, 5))
-        plt.plot(velocities)
-        plt.title(f"Agent {i+1} Velocities")
+        for i, velocity_magnitudes in enumerate(all_velocity_magnitudes):
+            plt.plot(velocity_magnitudes, label=f"Agent {i+1}")
+        plt.title(f"All Agents' Velocities Magnitudes - Episode {episode}")
         plt.xlabel("Timestep")
-        plt.ylabel("Velocity")
+        plt.ylabel("Velocity Magnitude")
+        plt.legend()
         plt.grid(True)
-        plt.savefig(f"Agent_{i+1}_velocities.png")
+        plt.savefig(f"Episode_{episode}_all_agents_velocities_magnitude.png")
+        plt.close()
 
-        # Plot accelerations
+        # Plot accelerations for all agents in one file per episode
         plt.figure(figsize=(10, 5))
-        plt.plot(accelerations)
-        plt.title(f"Agent {i+1} Accelerations")
+        for i, acceleration_magnitudes in enumerate(all_acceleration_magnitudes):
+            plt.plot(acceleration_magnitudes, label=f"Agent {i+1}")
+        plt.title(f"All Agents' Accelerations Magnitudes - Episode {episode}")
         plt.xlabel("Timestep")
-        plt.ylabel("Acceleration")
+        plt.ylabel("Acceleration Magnitude")
+        plt.legend()
         plt.grid(True)
-        plt.savefig(f"Agent_{i+1}_accelerations.png")
+        plt.savefig(f"Episode_{episode}_all_agents_accelerations_magnitude.png")
+        plt.close()
 
-        print("Analytics plots generated successfully.")
+        print(f"Plots for Episode {episode} - All Agents' velocities and accelerations magnitudes generated successfully.")
+
+
 
 if os.path.exists(Results["Rewards"]):
     os.remove(Results["Rewards"])
@@ -443,8 +466,7 @@ env.seed(random_seed)
 
 
 env = FlockingEnv()
-model = PPO.load(rf"{Files['Flocking']}\\Models\\FlockingCombined")
-
+model = PPO.load(rf"{Files['Flocking']}\\Models\\FlockingCombined1")
 
 delete_files()
 
@@ -461,7 +483,7 @@ episode_rewards_dict = {}
 positions_dict = {i: [] for i in range(len(env.agents))}
 
 # Log rewards against timestep for each episode
-for episode in range(0, SimulationVariables['Episodes']):
+for episode in tqdm(range(0, SimulationVariables['Episodes'])):
     env.episode = episode
     print("Episode:", episode)
     env.CTDE = True
@@ -471,21 +493,31 @@ for episode in range(0, SimulationVariables['Episodes']):
     reward_episode = []
     reward_cumulative = 0
     positions_dict = {i: [] for i in range(len(env.agents))}
+    velocities_dict = {i: [] for i in range(len(env.agents))}
+    accelerations_dict = {i: [] for i in range(len(env.agents))}
 
     while timestep <= SimulationVariables["EvalTimeSteps"]:
         action, state = model.predict(obs)
-        obs, _, done, _ = env.step(action)
-            
-            # Log agent positions, velocities, and accelerations
+        obs, reward, done, info = env.step(action)
+        reward_episode.append(reward)
+        
         for i, agent in enumerate(env.agents):
             positions_dict[i].append(agent.position.tolist())
 
-        timestep += 1
+            velocity_magnitude = np.linalg.norm(agent.velocity)
+            velocities_dict[i].append(velocity_magnitude)
 
+            acceleration_magnitude = np.linalg.norm(agent.acceleration)
+            accelerations_dict[i].append(acceleration_magnitude)
+
+        timestep += 1
         episode_rewards_dict[str(episode)] = reward_episode
 
-        # Save the positions, velocities, and accelerations as JSON files
         with open(f"{positions_directory}/Episode_{episode}.json", 'w') as f:
+            json.dump(positions_dict, f, indent=4)
+        with open(f"{positions_directory}/Episode_{episode}_velocities.json", 'w') as f:
+            json.dump(positions_dict, f, indent=4)
+        with open(f"{positions_directory}/Episode_{episode}_accelerations.json", 'w') as f:
             json.dump(positions_dict, f, indent=4)
 
     env.counter += 1
@@ -496,6 +528,6 @@ with open(rf"{Results['EpisodalRewards']}" + ".json" , 'w') as f:
 
 env.close()
 
-# generateResults1()
-# generateResults2()
-# generateAnalytics()
+generateResults1()
+generateResults2()
+generateDynamics()
