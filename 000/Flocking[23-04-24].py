@@ -454,6 +454,7 @@ def seed_everything(seed):
     th.cuda.manual_seed(seed)
     th.backends.cudnn.deterministic = True
     env.seed(seed)
+    env.action_space.seed(seed)
 
 
 env=FlockingEnv()
