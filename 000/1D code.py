@@ -108,10 +108,16 @@ class FlockingEnv(gym.Env):
         done=False
         info={}
 
+        
         #Noisy Actions
         observations = self.simulate_agents(actions)
         reward, out_of_flock = self.calculate_reward()
+        # if(self.current_timestep % 10000 == 0):   
+        # print("1", actions)
+        # print("2", observations)
+        # print("3", reward)
         
+
         if (self.CTDE==False):
             for agent in self.agents:
                 if((self.check_collision(agent)) or (out_of_flock==True)):
@@ -154,8 +160,11 @@ class FlockingEnv(gym.Env):
 
         observations = []  # Initialize an empty 1D array
 
+        actions_reshaped = actions.reshape((3, 2))
+        # print(actions_reshaped)
+
         for i, agent in enumerate(self.agents):
-            position, velocity = agent.update(actions[i])
+            position, velocity = agent.update(actions_reshaped[i])
             observation_pair = np.concatenate([position, velocity])
             observations = np.concatenate([observations, observation_pair])  # Concatenate each pair directly
 
