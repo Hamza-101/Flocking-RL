@@ -145,7 +145,7 @@ class FlockingEnv(gym.Env):
         # for i, agent in enumerate(self.agents):
         #     position, velocity = agent.update(actions[i])
         # observations.append(np.concatenate([position, velocity])) #-----------------------
-        observations = np.array([], dtype=np.float32)  # Initialize an empty 1D array
+        observations = []  # Initialize an empty 1D array
 
         for i, agent in enumerate(self.agents):
             position, velocity = agent.update(actions[i])
