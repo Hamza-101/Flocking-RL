@@ -47,9 +47,10 @@ class Agent:
         #Discuss this
         #Changed this
         
-        self.acceleration = action
-        # self.acceleration=np.clip(self.acceleration, -self.max_acceleration, self.max_acceleration)
-       
+        self.acceleration += action
+        self.acceleration=np.clip(self.acceleration, -self.max_acceleration, self.max_acceleration)
+        # print(self.acceleration)
+
         self.velocity += self.acceleration * SimulationVariables["dt"]
         vel = np.linalg.norm(self.velocity)
         if vel > self.max_velocity:
@@ -74,8 +75,8 @@ class FlockingEnv(gym.Env):
 
         self.agents = [Agent(position) for position in self.read_agent_locations()]
 
-        min_action = np.array([[-5, -5]] * len(self.agents), dtype=np.float32)
-        max_action = np.array([[5, 5]] * len(self.agents), dtype=np.float32)
+        min_action = np.array([-5, -5] * len(self.agents), dtype=np.float32)
+        max_action = np.array([5, 5] * len(self.agents), dtype=np.float32)
         self.action_space = spaces.Box(low=min_action, high=max_action, dtype=np.float32)
 
         #Check this
@@ -88,9 +89,14 @@ class FlockingEnv(gym.Env):
         training_rewards = {}
         
         noisy_actions = actions + np.random.normal(loc=0, scale=0.01, size=actions.shape)
+        actions = np.clip(noisy_actions, self.action_space.low, self.action_space.high)
+        # print(actions)
 
-        noisy_actions[:, 0] = np.clip(noisy_actions[:, 0], self.action_space.low[:, 0], self.action_space.high[:, 0])
-        noisy_actions[:, 1] = np.clip(noisy_actions[:, 1], self.action_space.low[:, 1], self.action_space.high[:, 1])
+        # 2D noise
+        # noisy_actions = actions + np.random.normal(loc=0, scale=0.01, size=actions.shape)
+
+        # noisy_actions[:, 0] = np.clip(noisy_actions[:, 0], self.action_space.low[:, 0], self.action_space.high[:, 0])
+        # noisy_actions[:, 1] = np.clip(noisy_actions[:, 1], self.action_space.low[:, 1], self.action_space.high[:, 1])
 
         # if(self.current_timestep % 400000 == 0):
         #     print(self.current_timestep)
@@ -145,6 +151,7 @@ class FlockingEnv(gym.Env):
         # for i, agent in enumerate(self.agents):
         #     position, velocity = agent.update(actions[i])
         # observations.append(np.concatenate([position, velocity])) #-----------------------
+
         observations = []  # Initialize an empty 1D array
 
         for i, agent in enumerate(self.agents):
@@ -476,61 +483,62 @@ os.makedirs(positions_directory, exist_ok=True)
 
 env.counter=10
 episode_rewards_dict = {}
-positions_dict = {i: [] for i in range(len(env.agents))}
-for episode in tqdm(range(0, SimulationVariables['Episodes'])):
-    env.episode = episode
-    print("Episode:", episode)
-    env.CTDE = True
-    obs = env.reset()
-    done = False
-    timestep = 0
-    reward_episode = []
+# positions_dict = {i: [] for i in range(len(env.agents))}
 
-    # Initialize dictionaries to store data
-    positions_dict = {i: [] for i in range(len(env.agents))}
-    velocities_dict = {i: [] for i in range(len(env.agents))}
-    accelerations_dict = {i: [] for i in range(len(env.agents))}
-    trajectory_dict = {i: [] for i in range(len(env.agents))}
+# for episode in tqdm(range(0, SimulationVariables['Episodes'])):
+#     env.episode = episode
+#     print("Episode:", episode)
+#     env.CTDE = True
+#     obs = env.reset()
+#     done = False
+#     timestep = 0
+#     reward_episode = []
 
-    while timestep < min(SimulationVariables["EvalTimeSteps"], 3000):
-        action, state = model.predict(obs)
-        actions = action.reshape(-1, 2)
+#     # Initialize dictionaries to store data
+#     positions_dict = {i: [] for i in range(len(env.agents))}
+#     velocities_dict = {i: [] for i in range(len(env.agents))}
+#     accelerations_dict = {i: [] for i in range(len(env.agents))}
+#     trajectory_dict = {i: [] for i in range(len(env.agents))}
 
-        obs, reward, done, info = env.step(actions)
-        reward_episode.append(reward)
+#     while timestep < min(SimulationVariables["EvalTimeSteps"], 3000):
+#         action, state = model.predict(obs)
+#         actions = action.reshape(-1, 2)
+
+#         obs, reward, done, info = env.step(actions)
+#         reward_episode.append(reward)
         
-        for i, agent in enumerate(env.agents):
+#         for i, agent in enumerate(env.agents):
 
-            positions_dict[i].append(agent.position.tolist())
+#             positions_dict[i].append(agent.position.tolist())
 
-            velocity = agent.velocity.tolist()
-            velocities_dict[i].append(velocity)
+#             velocity = agent.velocity.tolist()
+#             velocities_dict[i].append(velocity)
 
-            acceleration = agent.acceleration.tolist()
-            accelerations_dict[i].append(acceleration)
+#             acceleration = agent.acceleration.tolist()
+#             accelerations_dict[i].append(acceleration)
 
-            trajectory_dict[i].append(agent.position.tolist())
+#             trajectory_dict[i].append(agent.position.tolist())
 
-        timestep += 1
-        episode_rewards_dict[str(episode)] = reward_episode
+#         timestep += 1
+#         episode_rewards_dict[str(episode)] = reward_episode
 
-    with open(os.path.join(positions_directory, f"Episode{episode}_positions.json"), 'w') as f:
-        json.dump(positions_dict, f, indent=4)
-    with open(os.path.join(positions_directory, f"Episode{episode}_velocities.json"), 'w') as f:
-        json.dump(velocities_dict, f, indent=4)
-    with open(os.path.join(positions_directory, f"Episode{episode}_accelerations.json"), 'w') as f:
-        json.dump(accelerations_dict, f, indent=4)
-    with open(os.path.join(positions_directory, f"Episode{episode}_trajectory.json"), 'w') as f:
-        json.dump(trajectory_dict, f, indent=4)
+#     with open(os.path.join(positions_directory, f"Episode{episode}_positions.json"), 'w') as f:
+#         json.dump(positions_dict, f, indent=4)
+#     with open(os.path.join(positions_directory, f"Episode{episode}_velocities.json"), 'w') as f:
+#         json.dump(velocities_dict, f, indent=4)
+#     with open(os.path.join(positions_directory, f"Episode{episode}_accelerations.json"), 'w') as f:
+#         json.dump(accelerations_dict, f, indent=4)
+#     with open(os.path.join(positions_directory, f"Episode{episode}_trajectory.json"), 'w') as f:
+#         json.dump(trajectory_dict, f, indent=4)
 
-    env.counter += 1
-    print(sum(reward_episode))
-    break
+#     env.counter += 1
+#     print(sum(reward_episode))
+#     break
 
-with open(rf"{Results['EpisodalRewards']}.json", 'w') as f:
-    json.dump(episode_rewards_dict, f, indent=4)
+# with open(rf"{Results['EpisodalRewards']}.json", 'w') as f:
+#     json.dump(episode_rewards_dict, f, indent=4)
 
-env.close()
+# env.close()
 
 print("Testing completed")
 
