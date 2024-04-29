@@ -327,6 +327,7 @@ def generateSegregated():
             keys_below_threshold.append(episode)
 
     plt.figure(figsize=(8, 6))  
+    plt.clf()###################################
     for episode in keys_above_threshold:
         rewards = episode_rewards_dict[episode]
         smoothed_rewards = savgol_filter(rewards, 21, 3)  # Adjust window length and polynomial order as needed
@@ -369,7 +370,7 @@ def generateCombined():
             keys_below_threshold.append(episode)
 
     plt.figure(figsize=(10, 6))
-
+    plt.clf()#############################
     for episode in keys_above_threshold:
         rewards = episode_rewards_dict[episode]
         smoothed_rewards = savgol_filter(rewards, 21, 3)
@@ -389,28 +390,17 @@ def generateCombined():
     plt.savefig("Combined.png", dpi=3000)
 
 def generateAnalytics():
-    # Initialize dictionaries to store velocities and accelerations
-    velocities_dict = {}
-    accelerations_dict = {}
-    num_timesteps = None
-
     # Loop through episodes
     for episode in range(SimulationVariables["Episodes"]):
+        # Initialize dictionaries to store velocities and accelerations for this episode
+        velocities_dict = {}
+        accelerations_dict = {}
+
         # Read velocities and accelerations from JSON files
         with open(os.path.join(positions_directory, f"Episode{episode}_velocities.json"), 'r') as f:
             episode_velocities = json.load(f)
         with open(os.path.join(positions_directory, f"Episode{episode}_accelerations.json"), 'r') as f:
             episode_accelerations = json.load(f)
-
-        # Determine the number of timesteps
-        if episode == 0:
-            num_timesteps = len(episode_velocities['0'])
-        
-        # Truncate velocities and accelerations if they have more timesteps than episode 0
-        if len(episode_velocities['0']) > num_timesteps:
-            for agent_id in episode_velocities.keys():
-                episode_velocities[agent_id] = episode_velocities[agent_id][:num_timesteps]
-                episode_accelerations[agent_id] = episode_accelerations[agent_id][:num_timesteps]
 
         # Append velocities and accelerations to dictionaries
         for agent_id in range(len(env.agents)):
@@ -419,10 +409,11 @@ def generateAnalytics():
 
         # Plot velocities
         plt.figure(figsize=(10, 5))
+        plt.clf()  # Clear the current figure
         for agent_id in range(len(env.agents)):
             agent_velocities = np.array(velocities_dict[agent_id])
-            smoothed_velocities = savgol_filter(agent_velocities, window_length=31, polyorder=3, axis=0)
-            velocities_magnitude = np.sqrt(smoothed_velocities[:, 0]**2 + smoothed_velocities[:, 1]**2)  # Magnitude of velocities
+            smoothed_velocities = savgol_filter(agent_velocities, window_length=21, polyorder=3, axis=0)
+            velocities_magnitude = np.sqrt(agent_velocities[:, 0]**2 + agent_velocities[:, 1]**2)  # Magnitude of velocities
             plt.plot(velocities_magnitude, label=f"Agent {agent_id+1}")
         plt.title(f"Smoothed Velocity - Episode {episode}")
         plt.xlabel("Time Step")
@@ -433,10 +424,11 @@ def generateAnalytics():
 
         # Plot accelerations
         plt.figure(figsize=(10, 5))
+        plt.clf()  # Clear the current figure
         for agent_id in range(len(env.agents)):
             agent_accelerations = np.array(accelerations_dict[agent_id])
             smoothed_accelerations = savgol_filter(agent_accelerations, window_length=21, polyorder=3, axis=0)
-            accelerations_magnitude = np.sqrt(smoothed_accelerations[:, 0]**2 + smoothed_accelerations[:, 1]**2)  # Magnitude of accelerations
+            accelerations_magnitude = np.sqrt(agent_accelerations[:, 0]**2 + agent_accelerations[:, 1]**2)  # Magnitude of accelerations
             plt.plot(accelerations_magnitude, label=f"Agent {agent_id+1}")
         plt.title(f"Smoothed Acceleration - Episode {episode}")
         plt.xlabel("Time Step")
@@ -445,7 +437,6 @@ def generateAnalytics():
         plt.grid(True)
         plt.savefig(f"Episode{episode}_SmoothedAcceleration.png")
 #------------------------
-
 
 
 if os.path.exists(Results["Rewards"]):
@@ -470,15 +461,15 @@ def seed_everything(seed):
 env=FlockingEnv()
 seed_everything(SimulationVariables["Seed"])
 
-# Model Training
-model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs, tensorboard_log="./ppo_Agents_tensorboard/", verbose=1)
-model.set_random_seed(SimulationVariables["ModelSeed"])
-model.learn(total_timesteps=SimulationVariables["LearningTimeSteps"]) 
-model.save(rf"{Files['Flocking']}\\Models\\FlockingCombinedNew")
+# # Model Training
+# model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs, tensorboard_log="./ppo_Agents_tensorboard/", verbose=1)
+# model.set_random_seed(SimulationVariables["ModelSeed"])
+# model.learn(total_timesteps=SimulationVariables["LearningTimeSteps"]) 
+# model.save(rf"{Files['Flocking']}\\Models\\FlockingCombinedNew")
 
-# Model Testing
-env = FlockingEnv()
-model = PPO.load("FlockingCombined")
+# # Model Testing
+# env = FlockingEnv()
+# model = PPO.load("FlockingCombined")
 
 
 delete_files()
@@ -487,70 +478,70 @@ os.makedirs(positions_directory, exist_ok=True)
 
 #Test on all Flocking combined
 
-env.counter=3603
-episode_rewards_dict = {}
-positions_dict = {i: [] for i in range(len(env.agents))}
+# env.counter=3603
+# episode_rewards_dict = {}
+# positions_dict = {i: [] for i in range(len(env.agents))}
 
-for episode in tqdm(range(0, SimulationVariables['Episodes'])):
-    env.episode = episode
-    print("Episode:", episode)
-    env.CTDE = True
-    obs = env.reset()
-    done = False
-    timestep = 0
-    reward_episode = []
+# for episode in tqdm(range(0, SimulationVariables['Episodes'])):
+#     env.episode = episode
+#     print("Episode:", episode)
+#     env.CTDE = True
+#     obs = env.reset()
+#     done = False
+#     timestep = 0
+#     reward_episode = []
 
-    # Initialize dictionaries to store data
-    positions_dict = {i: [] for i in range(len(env.agents))}
-    velocities_dict = {i: [] for i in range(len(env.agents))}
-    accelerations_dict = {i: [] for i in range(len(env.agents))}
-    trajectory_dict = {i: [] for i in range(len(env.agents))}
+#     # Initialize dictionaries to store data
+#     positions_dict = {i: [] for i in range(len(env.agents))}
+#     velocities_dict = {i: [] for i in range(len(env.agents))}
+#     accelerations_dict = {i: [] for i in range(len(env.agents))}
+#     trajectory_dict = {i: [] for i in range(len(env.agents))}
 
-    while timestep < min(SimulationVariables["EvalTimeSteps"], 3000):
-        actions, state = model.predict(obs)
-        # actions = action.reshape(-1, 2)
-        actions=np.clip(actions, -(SimulationVariables["AccelerationUpperLimit"]), SimulationVariables["AccelerationUpperLimit"])
+#     while timestep < min(SimulationVariables["EvalTimeSteps"], 3000):
+#         actions, state = model.predict(obs)
+#         # actions = action.reshape(-1, 2)
+#         actions=np.clip(actions, -(SimulationVariables["AccelerationUpperLimit"]), SimulationVariables["AccelerationUpperLimit"])
 
-        obs, reward, done, info = env.step(actions)
-        reward_episode.append(reward)
+#         obs, reward, done, info = env.step(actions)
+#         reward_episode.append(reward)
         
-        for i, agent in enumerate(env.agents):
+#         for i, agent in enumerate(env.agents):
 
-            positions_dict[i].append(agent.position.tolist())
+#             positions_dict[i].append(agent.position.tolist())
 
-            velocity = agent.velocity.tolist()
-            velocities_dict[i].append(velocity)
+#             velocity = agent.velocity.tolist()
+#             velocities_dict[i].append(velocity)
 
-            acceleration = agent.acceleration.tolist()
-            accelerations_dict[i].append(acceleration)
+#             acceleration = agent.acceleration.tolist()
+#             accelerations_dict[i].append(acceleration)
 
-            trajectory_dict[i].append(agent.position.tolist())
+#             trajectory_dict[i].append(agent.position.tolist())
 
-        timestep += 1
-        episode_rewards_dict[str(episode)] = reward_episode
+#         timestep += 1
+#         episode_rewards_dict[str(episode)] = reward_episode
 
-    with open(os.path.join(positions_directory, f"Episode{episode}_positions.json"), 'w') as f:
-        json.dump(positions_dict, f, indent=4)
-    with open(os.path.join(positions_directory, f"Episode{episode}_velocities.json"), 'w') as f:
-        json.dump(velocities_dict, f, indent=4)
-    with open(os.path.join(positions_directory, f"Episode{episode}_accelerations.json"), 'w') as f:
-        json.dump(accelerations_dict, f, indent=4)
-    with open(os.path.join(positions_directory, f"Episode{episode}_trajectory.json"), 'w') as f:
-        json.dump(trajectory_dict, f, indent=4)
+#     with open(os.path.join(positions_directory, f"Episode{episode}_positions.json"), 'w') as f:
+#         json.dump(positions_dict, f, indent=4)
+#     with open(os.path.join(positions_directory, f"Episode{episode}_velocities.json"), 'w') as f:
+#         json.dump(velocities_dict, f, indent=4)
+#     with open(os.path.join(positions_directory, f"Episode{episode}_accelerations.json"), 'w') as f:
+#         json.dump(accelerations_dict, f, indent=4)
+#     with open(os.path.join(positions_directory, f"Episode{episode}_trajectory.json"), 'w') as f:
+#         json.dump(trajectory_dict, f, indent=4)
 
-    env.counter += 1
-    print(sum(reward_episode))
+#     env.counter += 1
+#     print(sum(reward_episode))
     
 
-with open(rf"{Results['EpisodalRewards']}.json", 'w') as f:
-    json.dump(episode_rewards_dict, f, indent=4)
+# with open(rf"{Results['EpisodalRewards']}.json", 'w') as f:
+#     json.dump(episode_rewards_dict, f, indent=4)
 
-env.close()
+# env.close()
 
-print("Testing completed")
+# print("Testing completed")
 
-# Analytics
-print("Generating Results")
+# # Analytics
+# print("Generating Results")
 
 generateSegregated()
 generateCombined()
