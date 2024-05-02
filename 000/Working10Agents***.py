@@ -10,6 +10,7 @@ from gym import spaces
 import matplotlib.pyplot as plt
 from stable_baselines3 import PPO
 from scipy.signal import savgol_filter
+from stable_baselines3.common.callbacks import BaseCallback
 
 # Activation Function -> Tanh
 # Layers -> 8 Actor 8 Critic
@@ -64,9 +65,7 @@ class Encoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)  
 
 
-# 3 Agents
-
-
+# 10 Agents
 class FlockingEnv(gym.Env):
     def __init__(self):
 
@@ -97,16 +96,28 @@ class FlockingEnv(gym.Env):
         actions = np.clip(noisy_actions, self.action_space.low, self.action_space.high)
         # print(actions)
 
-        # 2D noise
-        # noisy_actions = actions + np.random.normal(loc=0, scale=0.01, size=actions.shape)
 
-        # noisy_actions[:, 0] = np.clip(noisy_actions[:, 0], self.action_space.low[:, 0], self.action_space.high[:, 0])
-        # noisy_actions[:, 1] = np.clip(noisy_actions[:, 1], self.action_space.low[:, 1], self.action_space.high[:, 1])
 
+
+
+
+
+
+        #Overfitting
         # if(self.current_timestep % 400000 == 0):
         #     print(self.current_timestep)
         #     self.counter = self.counter + 1
         #     print("Counter", self.counter)
+
+
+
+
+
+
+
+
+
+
 
         self.current_timestep+=1
         reward=0
@@ -452,14 +463,32 @@ def seed_everything(seed):
     env.seed(seed)
     env.action_space.seed(seed)
 
+class LossCallback(BaseCallback):
+    def __init__(self, verbose=0):
+        super(LossCallback, self).__init__(verbose)
+        self.loss_threshold = 2000
+
+    def _on_step(self) -> bool:
+        # Accessing the last 1000 losses
+        if len(self.model.ep_info_buffer) >= 1000:
+            recent_losses = [ep_info['loss'] for ep_info in self.model.ep_info_buffer[-1000:]]
+            average_loss = np.mean(recent_losses)
+
+            if average_loss < self.loss_threshold:
+                print(f"Stopping training because average loss ({average_loss}) is below threshold.")
+                return False  # Returning False stops the training
+
+        return True
+
 env=FlockingEnv()
 seed_everything(SimulationVariables["Seed"])
+loss_callback = LossCallback()
 
-# # Model Training
-# model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs, tensorboard_log="./ppo_Agents_tensorboard/", verbose=1)
-# model.set_random_seed(SimulationVariables["ModelSeed"])
-# model.learn(total_timesteps=SimulationVariables["LearningTimeSteps"]) 
-# model.save(rf"{Files['Flocking']}\\Models\\FlockingCombinedNew")
+# Model Training
+model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs, tensorboard_log="./ppo_Agents_tensorboard/", verbose=1)
+model.set_random_seed(SimulationVariables["ModelSeed"])
+model.learn(total_timesteps=SimulationVariables["LearningTimeSteps"], callback=loss_callback)
+model.save(rf"{Files['Flocking']}\\Models\\FlockingCombinedNew")
 
 # Model Testing
 env = FlockingEnv()
