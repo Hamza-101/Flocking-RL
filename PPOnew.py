@@ -8,15 +8,19 @@ from tqdm import tqdm
 from Settings import *
 from gym import spaces
 import matplotlib.pyplot as plt
-from stable_baselines3 import DDPG, get_system_info
+from stable_baselines3 import PPO, get_system_info
 from stable_baselines3.common.callbacks import BaseCallback
 from scipy.signal import savgol_filter
-from stable_baselines3.common.callbacks import BaseCallback
+
+# Ensure the model only uses CPU
+# Ensure the model only uses CPU
+th.cuda.is_available = lambda: True
 
 # Neural Network Parameters
 policy_kwargs = dict(
-    activation_fn=th.nn.ReLU,  # Change activation function if needed
-    net_arch=[512, 512, 512, 512]  # Actor and Critic network architecture for DDPG
+    activation_fn=th.nn.Tanh,  # Using ReLU activation function
+    net_arch=[dict(pi=[512, 512, 512, 512, 512, 512, 512, 512], 
+                   vf=[512, 512, 512, 512, 512, 512, 512, 512])]  # Separate networks for policy (pi) and value function (vf)
 )
 
 
@@ -137,7 +141,10 @@ class FlockingEnv(gym.Env):
             agent.velocity = np.round(np.random.uniform(-SimulationVariables["VelocityUpperLimit"], SimulationVariables["VelocityUpperLimit"], size=2), 2)             
 
         observation = self.get_observation().flatten()
-
+        
+        ################################
+        self.current_timestep = 0  # Reset time step count
+        ################################
         return observation   
 
     def close(self):
@@ -235,13 +242,15 @@ class FlockingEnv(gym.Env):
                 distance = np.linalg.norm(agent.position - neighbor_position)
 
                 if distance <= SimulationVariables["SafetyRadius"]:
-                    CohesionReward += -10
+                    CohesionReward += 0
+                    
                 elif SimulationVariables["SafetyRadius"] < distance <= midpoint:
                     CohesionReward += (10 / (midpoint - SimulationVariables["SafetyRadius"])) * (distance - SimulationVariables["SafetyRadius"])
+
                 elif midpoint < distance <= SimulationVariables["NeighborhoodRadius"]:
                     CohesionReward += 10 - (10 / (SimulationVariables["NeighborhoodRadius"] - midpoint)) * (distance - midpoint)
       
-                average_velocity = np.mean(neighbor_velocities, axis=0)
+                average_velocity = np.mean(neighbor_velocities, axis = 0)
                 dot_product = np.dot(average_velocity, agent.velocity)
                 norm_product = np.linalg.norm(average_velocity) * np.linalg.norm(agent.velocity)
 
@@ -253,8 +262,11 @@ class FlockingEnv(gym.Env):
                 cos_angle = np.clip(cos_angle, -1.0, 1.0)
                 orientation_diff = np.arccos(cos_angle)
 
+
                 alignment = (orientation_diff / np.pi)
                 AlignmentReward = -20 * alignment + 10  
+
+
 
         else:
             CohesionReward -= 10
@@ -316,16 +328,13 @@ def generateCombined():
     plt.figure(figsize=(10, 6))
     plt.clf()
 
-
     #Fix this
     for episode in keys_above_threshold:
         rewards = episode_rewards_dict[episode]
-        # smoothed_rewards = savgol_filter(rewards, 31, 3)
         plt.plot(range(1, len(rewards) + 1), rewards, label=f"Episode {episode}", alpha=0.7)
 
     for episode in keys_below_threshold:
         rewards = episode_rewards_dict[episode]
-        # smoothed_rewards = savgol_filter(rewards, 31, 3)
         plt.plot(range(1, len(rewards) + 1), rewards, label=f"Episode {episode}", alpha=0.7)
 
     plt.xlabel("Timestep")
@@ -334,7 +343,7 @@ def generateCombined():
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("Output.png", dpi=3000)
+    plt.savefig("Output.png", dpi=300)
 
 def generateVelocity():
     # Loop through episodes
@@ -353,7 +362,7 @@ def generateVelocity():
             agent_velocities = np.array(velocities_dict[agent_id])
             # agent_velocities = savgol_filter(agent_velocities, window_length=5, polyorder=3, axis=0)
             velocities_magnitude = np.sqrt(agent_velocities[:, 0]**2 + agent_velocities[:, 1]**2)  
-
+      
             plt.plot(velocities_magnitude, label=f"Agent {agent_id+1}")
 
         plt.title(f"Velocity - Episode {episode}")
@@ -372,14 +381,15 @@ def generateAcceleration():
         plt.clf()
 
         for agent_id in range(len(env.agents)):
+
             agent_accelerations = np.array(episode_accelerations[str(agent_id)])
 
-            smoothed_accelerations = savgol_filter(agent_accelerations, window_length=5, polyorder=3, axis=0)
+            smoothed_accelerations=np.sqrt(agent_accelerations[:, 0]**2 + agent_accelerations[:, 1]**2)
+            # print(smoothed_accelerations)
 
-            # smoothed_accelerations = np.sqrt(smoothed_accelerations[:, 0]**2 + smoothed_accelerations[:, 1]**2)
+            smoothed_accelerations = savgol_filter(smoothed_accelerations, window_length=3, polyorder=2, axis=0)
             accelerations_magnitude = np.clip(smoothed_accelerations, 0, 5) 
 
-          
             plt.plot(accelerations_magnitude, label=f"Agent {agent_id+1}")
 
         plt.title(f"Acceleration - Episode {episode}")
@@ -388,6 +398,17 @@ def generateAcceleration():
         plt.legend()
         plt.grid(True)
         plt.savefig(f"Episode{episode}_SmoothedAcceleration.png")
+
+def exponential_moving_average(data, alpha=0.1):
+    ema = np.zeros_like(data)
+    ema[0] = data[0]
+    for t in range(1, len(data)):
+        ema[t] = alpha * data[t] + (1 - alpha) * ema[t - 1]
+    return ema
+
+
+def moving_average(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='same')
 
 #------------------------
 
@@ -417,37 +438,38 @@ if os.path.exists("training_rewards.json"):
     os.remove("training_rewards.json")
     print(f"File training_rewards has been deleted.")    
 
-def seed_everything(seed):
-    np.random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    th.manual_seed(seed)
-    th.cuda.manual_seed(seed)
-    th.backends.cudnn.deterministic = True
-    env.seed(seed)
-    env.action_space.seed(seed)
+# def seed_everything(seed):
+#     np.random.seed(seed)
+#     os.environ['PYTHONHASHSEED'] = str(seed)
+#     th.manual_seed(seed)
+#     th.cuda.manual_seed(seed)
+#     th.backends.cudnn.deterministic = True
+#     env.seed(seed)
+#     env.action_space.seed(seed)
 
 env=FlockingEnv()
-seed_everything(SimulationVariables["Seed"])
+# seed_everything(SimulationVariables["Seed"])
 loss_callback = LossCallback()
 
-get_system_info()
-print(env.action_space.shape)
-print(env.observation_space.shape)
+# get_system_info()
+# print(env.action_space.shape)
+# print(env.observation_space.shape)
 
-# # Model Training
-model = DDPG("MlpPolicy", env, policy_kwargs=policy_kwargs, tensorboard_log="./ddpg_Agents_tensorboard/", verbose=1)
-model.set_random_seed(SimulationVariables["ModelSeed"])
-progress_callback = TQDMProgressCallback(total_timesteps=SimulationVariables["LearningTimeSteps"])
-# Train the model
-model.learn(total_timesteps=SimulationVariables["LearningTimeSteps"], callback=[progress_callback, loss_callback])
-# model.learn(total_timesteps=SimulationVariables["LearningTimeSteps"], callback=loss_callback)
-model.save(rf"{Files['Flocking']}\\Models\\FlockingCombinedNew")
+
+# # # Model Training
+# model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs, tensorboard_log="./ppo_Agents_tensorboard/", verbose=1)
+# model.set_random_seed(SimulationVariables["ModelSeed"])
+# progress_callback = TQDMProgressCallback(total_timesteps=SimulationVariables["LearningTimeSteps"])
+# # Train the model
+# model.learn(total_timesteps=SimulationVariables["LearningTimeSteps"], callback=[progress_callback, loss_callback])
+# # model.learn(total_timesteps=SimulationVariables["LearningTimeSteps"], callback=loss_callback)
+# model.save(rf"{Files['Flocking']}\\Models\\FlockingCombinedNew")
 
 # Model Testing
-env = FlockingEnv()
-model = DDPG.load(rf'{Files["Flocking"]}\Models\FlockingCombinedNew')
+# env = FlockingEnv()
+# model = PPO.load(rf'{Files["Flocking"]}\Models\FlockingCombinedNew')
 
-# delete_files()
+# # delete_files()
 positions_directory = rf"{Files['Flocking']}/Testing/Episodes/"
 os.makedirs(positions_directory, exist_ok=True)
 
@@ -455,61 +477,61 @@ env.counter=389
 episode_rewards_dict = {}
 positions_dict = {i: [] for i in range(len(env.agents))}
 
-for episode in tqdm(range(0, SimulationVariables['Episodes'])):
-    env.episode = episode
-    print("Episode:", episode)
-    env.CTDE = True
-    obs = env.reset()
-    done = False
-    timestep = 0
-    reward_episode = []
+# for episode in tqdm(range(0, SimulationVariables['Episodes'])):
+#     env.episode = episode
+#     print("Episode:", episode)
+#     env.CTDE = True
+#     obs = env.reset()
+#     done = False
+#     timestep = 0
+#     reward_episode = []
 
-    # Initialize dictionaries to store data
-    positions_dict = {i: [] for i in range(len(env.agents))}
-    velocities_dict = {i: [] for i in range(len(env.agents))}
-    accelerations_dict = {i: [] for i in range(len(env.agents))}
-    trajectory_dict = {i: [] for i in range(len(env.agents))}
+#     # Initialize dictionaries to store data
+#     positions_dict = {i: [] for i in range(len(env.agents))}
+#     velocities_dict = {i: [] for i in range(len(env.agents))}
+#     accelerations_dict = {i: [] for i in range(len(env.agents))}
+#     trajectory_dict = {i: [] for i in range(len(env.agents))}
 
-    while timestep < min(SimulationVariables["EvalTimeSteps"], 3000):
-        actions, state = model.predict(obs)
-        obs, reward, done, info = env.step(actions)
-        reward_episode.append(reward)
+#     while timestep < min(SimulationVariables["EvalTimeSteps"], 3000):
+#         actions, state = model.predict(obs)
+#         obs, reward, done, info = env.step(actions)
+#         reward_episode.append(reward)
         
-        for i, agent in enumerate(env.agents):
+#         for i, agent in enumerate(env.agents):
 
-            positions_dict[i].append(agent.position.tolist())
-            velocity = agent.velocity.tolist()
-            velocities_dict[i].append(velocity)
-            acceleration = agent.acceleration.tolist()
-            accelerations_dict[i].append(acceleration)
-            trajectory_dict[i].append(agent.position.tolist())
+#             positions_dict[i].append(agent.position.tolist())
+#             velocity = agent.velocity.tolist()
+#             velocities_dict[i].append(velocity)
+#             acceleration = agent.acceleration.tolist()
+#             accelerations_dict[i].append(acceleration)
+#             trajectory_dict[i].append(agent.position.tolist())
 
-        timestep += 1
-        episode_rewards_dict[str(episode)] = reward_episode
+#         timestep += 1
+#         episode_rewards_dict[str(episode)] = reward_episode
 
-    with open(os.path.join(positions_directory, f"Episode{episode}_positions.json"), 'w') as f:
-        json.dump(positions_dict, f, indent=4)
-    with open(os.path.join(positions_directory, f"Episode{episode}_velocities.json"), 'w') as f:
-        json.dump(velocities_dict, f, indent=4)
-    with open(os.path.join(positions_directory, f"Episode{episode}_accelerations.json"), 'w') as f:
-        json.dump(accelerations_dict, f, indent=4)
-    with open(os.path.join(positions_directory, f"Episode{episode}_trajectory.json"), 'w') as f:
-        json.dump(trajectory_dict, f, indent=4)
+#     with open(os.path.join(positions_directory, f"Episode{episode}_positions.json"), 'w') as f:
+#         json.dump(positions_dict, f, indent=4)
+#     with open(os.path.join(positions_directory, f"Episode{episode}_velocities.json"), 'w') as f:
+#         json.dump(velocities_dict, f, indent=4)
+#     with open(os.path.join(positions_directory, f"Episode{episode}_accelerations.json"), 'w') as f:
+#         json.dump(accelerations_dict, f, indent=4)
+#     with open(os.path.join(positions_directory, f"Episode{episode}_trajectory.json"), 'w') as f:
+#         json.dump(trajectory_dict, f, indent=4)
 
-    env.counter += 1
-    print(sum(reward_episode))
+#     env.counter += 1
+#     print(sum(reward_episode))
     
 
-with open(rf"{Results['EpisodalRewards']}.json", 'w') as f:
-    json.dump(episode_rewards_dict, f, indent=4)
+# with open(rf"{Results['EpisodalRewards']}.json", 'w') as f:
+#     json.dump(episode_rewards_dict, f, indent=4)
 
-env.close()
-print("Testing completed")
+# env.close()
+# print("Testing completed")
 
 # Analytics
 print("Generating Results")
 generateCombined()
-print("Generating Velocity")
-generateVelocity()
-print("Generating Acceleration")
-generateAcceleration()
+# print("Generating Velocity")
+# generateVelocity()
+# print("Generating Acceleration")
+# generateAcceleration()
